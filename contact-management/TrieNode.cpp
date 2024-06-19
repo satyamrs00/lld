@@ -10,7 +10,7 @@ public:
     AbstractTrieNode(){}
 };
 
-class AlphabetTrieNode : public AbstractTrieNode {
+class AlphabetTrieNode:AbstractTrieNode {
 public:
     vector<AlphabetTrieNode*> _next;
     set<int> _ids;
@@ -20,7 +20,7 @@ public:
     }
 };
 
-class DigitTrieNode : public AbstractTrieNode {
+class DigitTrieNode:AbstractTrieNode {
 // private:
 public:
     vector<DigitTrieNode*> _next;

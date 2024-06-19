@@ -1,6 +1,6 @@
 #include "bits/stdc++.h"
 #include "ContactBuilder.cpp"
-#include "TrieNode.cpp"
+#include "Trie.cpp"
 
 using namespace std;
 
@@ -10,14 +10,14 @@ private:
     ContactBuilder *_contactBuilder;
 
     unordered_map<int, Contact *> _contacts;
-    AlphabetTrieNode *_firstNameTrie;
-    AlphabetTrieNode *_lastNameTrie;
-    DigitTrieNode *_phoneNumberTrie;
+    AlphabetTrie *_firstNameTrie;
+    AlphabetTrie *_lastNameTrie;
+    DigitTrie *_phoneNumberTrie;
 
     ContactBook(){
-        _firstNameTrie = new AlphabetTrieNode();
-        _lastNameTrie = new AlphabetTrieNode();
-        _phoneNumberTrie = new DigitTrieNode();
+        _firstNameTrie = new AlphabetTrie();
+        _lastNameTrie = new AlphabetTrie();
+        _phoneNumberTrie = new DigitTrie();
         _contactBuilder = new ContactBuilder();
     }
 
@@ -28,89 +28,6 @@ public:
 
     static ContactBook *getInstance();
 
-    void insertIntoAlphabetTrie(AlphabetTrieNode *root, Contact *contact){
-        auto r = root;
-        for (char c : contact->firstName()){
-            if (c >= 'A' && c <= 'Z') c = c - 'A' + 'a';
-
-            if (!r->_next[c-'a']) r->_next[c-'a'] = new AlphabetTrieNode();
-            r = r->_next[c-'a'];
-        }
-        r->_ids.insert(contact->id());
-    }
-    void removeFromAlphabetTrie(AlphabetTrieNode *root, Contact *contact){
-        auto r = root;
-        for (char c : contact->firstName()){
-            if (c >= 'A' && c <= 'Z') c = c - 'A' + 'a';
-
-            if (r->_next[c-'a']) r = r->_next[c-'a'];
-            else return;
-        }
-        r->_ids.erase(contact->id());
-    }
-    void insertIntoDigitTrie(DigitTrieNode *root, Contact *contact){
-        auto r = root;
-        for (char c : contact->phoneNumber()){
-            if (!r->_next[c-'0']) r->_next[c-'0'] = new DigitTrieNode();
-            r = r->_next[c-'0'];
-        }
-        r->_ids.insert(contact->id());
-    }
-    void removeFromDigitTrie(DigitTrieNode *root, Contact *contact){
-        auto r = root;
-        for (char c : contact->phoneNumber()){
-            if (r->_next[c-'0']) r = r->_next[c-'0'];
-            else return;
-        }
-        r->_ids.erase(contact->id());
-    }
-
-    void searchInAlphabetTrie(AlphabetTrieNode *root, set<int>& result, string query){
-        auto r = root;
-        for (auto c : query){
-            if (c >= '0' && c <= '9') return;
-            if (c >= 'A' && c <= 'Z') c = c - 'A' + 'a';
-
-            r = r->_next[c-'a'];
-            if (!r) return;
-        }
-        stack<AlphabetTrieNode *> s;
-        s.push(r);
-        while(!s.empty()){
-            auto t = s.top(); s.pop();
-            if (t->_ids.size() > 0){
-                for (auto it = t->_ids.begin(); it != t->_ids.end(); it++){
-                    result.insert(*it);
-                }
-            }
-            for (auto x : t->_next){
-                if (x) s.push(x);
-            }
-        }
-    }
-    void searchInDigitTrie(DigitTrieNode *root, set<int>& result, string query){
-        auto r = root;
-        for (auto c : query){
-            if (!(c >= '0' && c <= '9')) return;
-
-            r = r->_next[c-'0'];
-            if (!r) return;
-        }
-        stack<DigitTrieNode *> s;
-        s.push(r);
-        while(!s.empty()){
-            auto t = s.top(); s.pop();
-            if (t->_ids.size() > 0){
-                for (auto it = t->_ids.begin(); it != t->_ids.end(); it++){
-                    result.insert(*it);
-                }
-            }
-            for (auto x : t->_next){
-                if (x) s.push(x);
-            }
-        }
-    }
-
     Contact *addContact(string firstName, string lastName, string phoneNumber){
         _contactBuilder->setName(firstName, lastName);
         _contactBuilder->setPhoneNumber(phoneNumber);
@@ -118,17 +35,17 @@ public:
 
         _contacts[c->id()] = c;
 
-        insertIntoAlphabetTrie(_firstNameTrie, c);
-        insertIntoAlphabetTrie(_lastNameTrie, c);
-        insertIntoDigitTrie(_phoneNumberTrie, c);
+        _firstNameTrie->insert(c->firstName(), c->id());
+        _lastNameTrie->insert(c->lastName(), c->id());
+        _phoneNumberTrie->insert(c->phoneNumber(), c->id());
 
         return c;
     }
 
     Contact *updateContact(Contact *contact, string firstName, string lastName, string phoneNumber){
-        removeFromAlphabetTrie(_firstNameTrie, contact);
-        removeFromAlphabetTrie(_lastNameTrie, contact);
-        removeFromDigitTrie(_phoneNumberTrie, contact);
+        _firstNameTrie->erase(contact->firstName(), contact->id());
+        _lastNameTrie->erase(contact->lastName(), contact->id());
+        _phoneNumberTrie->erase(contact->phoneNumber(), contact->id());
 
         _contactBuilder->useContact(contact);
         _contactBuilder->setName(firstName, lastName);
@@ -137,9 +54,9 @@ public:
 
         _contacts[c->id()] = c;
 
-        insertIntoAlphabetTrie(_firstNameTrie, c);
-        insertIntoAlphabetTrie(_lastNameTrie, c);
-        insertIntoDigitTrie(_phoneNumberTrie, c);
+        _firstNameTrie->insert(c->firstName(), c->id());
+        _lastNameTrie->insert(c->lastName(), c->id());
+        _phoneNumberTrie->insert(c->phoneNumber(), c->id());
 
         return c;
     }
@@ -147,10 +64,14 @@ public:
     tuple<int, vector<Contact *>> search(string query){
         set<int> result;
 
-        searchInAlphabetTrie(_firstNameTrie, result, query);
-        searchInAlphabetTrie(_lastNameTrie, result, query);
-        searchInDigitTrie(_phoneNumberTrie, result, query);
+        auto resultsByFirstName = _firstNameTrie->search(query);
+        auto resultsByLastName = _lastNameTrie->search(query);
+        auto resultsByPhoneNumber = _phoneNumberTrie->search(query);
 
+        result.insert(resultsByFirstName.begin(), resultsByFirstName.end());
+        result.insert(resultsByLastName.begin(), resultsByLastName.end());
+        result.insert(resultsByPhoneNumber.begin(), resultsByPhoneNumber.end());
+        
         vector<Contact *> ans;
         for (auto it = result.begin(); it != result.end(); it++){
             ans.push_back(_contacts[*it]);
